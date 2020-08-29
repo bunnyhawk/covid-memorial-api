@@ -33,7 +33,6 @@ app.get('/', async (req, res, next) => {
           CSV: {
             FileHeaderInfo: 'USE',
             FieldDelimiter: ',',
-            // RecordDelimiter: '\n',
             AllowQuotedRecordDelimiter: true
           }
         },
@@ -69,7 +68,7 @@ app.get('/', async (req, res, next) => {
     `SELECT * from S3Object LIMIT ${req.query.records || '100'}`
   ).then( data => {
     const result = 'name,age,location,date,about,source\n' + data;
-    // csv({ trim: true }).fromString();
+
     return csv({ trim: true }).fromString(result).then(result => {
       res.status(200).send(result);
     });
