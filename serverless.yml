@@ -7,15 +7,25 @@ provider:
   region: us-west-2
   stackName: myserverless-lambda-${self:provider.stage}
   role: arn:aws:iam::515110458415:role/lambda-apigateway-role
+  apiGateway:
+    binaryMediaTypes:
+      - "*/*"
+      - "multipart/form-data"
+  environment:
+    MAIL_ACCESS: "jszt ovpp eccf vgta"
 
 functions:
-  readCsv:
-    handler: handler.readCsv
-    name: ${self:provider.stage}-mylambda
+  covidApi:
+    handler: handler.covidApi
+    name: ${self:provider.stage}-covidApi-lambda
     events:
       - http:
-          path: /
-          method: any
+          path: send-mail
+          method: post
           cors: true
           private: false
-
+          request:
+            parameters:
+              headers:
+                - "Accept"
+                - "Content-Type"

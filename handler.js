@@ -1,81 +1,123 @@
-'use strict';
+"use strict";
 
-const express = require('express');
+const express = require("express");
+const bodyParser = require("body-parser");
 const app = express();
-const S3 = require('aws-sdk/clients/s3');
-const csv = require('csvtojson');
-const sls = require('serverless-http');
+const Busboy = require("busboy");
+const sls = require("serverless-http");
+const nodemailer = require("nodemailer");
+const { Logger } = require("lambda-logger-node");
+const logger = Logger();
 
-app.use(function(req, res, next) {
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(bodyParser.raw());
+app.use(function (req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Credentials", true);
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "x-www-form-urlencoded, Origin, X-Requested-With, Content-Type, Accept, Authorization, *"
+  );
   next();
 });
 
-
-app.get('/', async (req, res, next) => {
-  if (req.query) {
-    console.log(req.query);
-  }
-  const s3 = new S3({
-    region: 'us-west-2'
-  });
-
-  const s3SelectQuery = (query) => {
-    return new Promise((resolve, reject) => {
-      const params = {
-        Bucket: 'covid-names-memorial',
-        Key: 'nyt.csv',
-        ExpressionType: 'SQL',
-        Expression: query,
-        InputSerialization: {
-          CSV: {
-            FileHeaderInfo: 'USE',
-            FieldDelimiter: ',',
-            AllowQuotedRecordDelimiter: true
-          }
-        },
-        OutputSerialization: {
-          CSV: {
-            FieldDelimiter: ',',
-            QuoteFields: 'ALWAYS'
-          }
-        }
-      };
-
-      let resultData = '';
-      s3.selectObjectContent(params, (err, data) => {
-        if(!err){
-          data.Payload.on('data', (data) => {
-            if (data.Records && data.Records.Payload) {
-                let str = Buffer.from(data.Records.Payload);
-                resultData += str;
-            }            
-          });
-          data.Payload.on('end', (data) => {
-              resolve(resultData);
-          })
-        } else {
-          reject(err);
-        }
-      });
-    });
+app.post("/send-mail", async (req, res, next) => {
+  const result = {
+    files: [],
   };
 
+  var busboy = new Busboy({
+    headers: {
+      ...req.headers,
+      "content-type":
+        req.headers["Content-Type"] || req.headers["content-type"],
+    },
+  });
 
-  s3SelectQuery(
-    `SELECT * from S3Object LIMIT ${req.query.records || '100'}`
-  ).then( data => {
-    const result = 'name,age,location,date,about,source\n' + data;
+  busboy.on("file", function (fieldname, file, filename, encoding, mimetype) {
+    let currentFile = {
+      filename,
+      encoding,
+      contentType: mimetype,
+      data: [],
+    };
 
-    return csv({ trim: true }).fromString(result).then(result => {
-      res.status(200).send(result);
+    file.on("data", function (data) {
+      currentFile.data.push(data);
     });
-    
-  })
+    file.on("end", function () {
+      currentFile.data = Buffer.concat(currentFile.data);
+      result.files.push(currentFile);
+    });
+  });
+  busboy.on("field", function (fieldname, value) {
+    try {
+      result[fieldname] = JSON.parse(value);
+    } catch (err) {
+      result[fieldname] = value;
+    }
+  });
+  busboy.on("finish", function () {
+    main();
+  });
 
-  
+  req.pipe(busboy);
+
+  function main() {
+    let transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: "positronicshell@gmail.com",
+        pass: process.env.MAIL_ACCESS,
+      },
+    });
+
+    const message = {
+      from: '"Robert" <positronicshell@gmail.com>', // sender address
+      to: "positronicshell@gmail.com", // list of receivers
+      subject: "Honor A Loved One: Submission",
+      text: "A submission for consideration on the COVID Memorial", // plain text body
+      html: `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+        </head>
+        <body>
+          <h1>Honor A Loved One: Submission</h1>
+          <p>THE DECEASED</p>
+          <ul>
+            <li>First Name: ${result.firstName}</li>
+            <li>Last Name: ${result.lastName}</li>
+            <li>Age: ${result.age}</li>
+            <li>Location: ${result.location}</li>
+            <li>What were they like?: ${result.about}</li>
+          </ul>
+          <p>SUBMITTER</p>
+          <ul>
+            <li>Name: ${result.submitName}</li>
+            <li>Relation: ${result.submitRelation}</li>
+            <li>Email: ${result.email}</li>
+          </ul>
+        </body>
+      </html>`,
+      attachments: result.files.map((file, index) => ({
+        filename: file.filename,
+        content: new Buffer.from(file.data, "binary"),
+        contentType: file.contentType,
+      })),
+    };
+
+    transporter.sendMail(message, function (err, info) {
+      if (err) {
+        logger.error(err);
+      } else {
+        res.status(200).send("Submit is a success");
+      }
+    });
+  }
 });
 
-module.exports.readCsv = sls(app);
+module.exports.covidApi = sls(app);
