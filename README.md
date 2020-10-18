@@ -1,19 +1,18 @@
-# COVID-19 Memorial API
+# COVID-19 Memorial Emailer API
 
-### INFO
-This is a sister project for the COVID Memorial project. This is used to query an AWS S3 bucket containing a CSV file where the records of the lives affected by COVID are kept.
+## INFO
+This is a sister project for the COVID Memorial project. This service passes form fields and accepted file types through Nodemailer and AWS Lambda.
 ```
 https://github.com/bunnyhawk/covid-memorial
 ```
 
-### GET
+## POST
 ```
-https://a6sz7rpoic.execute-api.us-west-2.amazonaws.com/dev/?records=100
+https://rdgqc6nd42.execute-api.us-west-2.amazonaws.com/dev/send-mail
 ```
-Records query gives top number of results 
 
 
-### Deploy
+## Deploy
 ```
 sls deploy -v
 ```
