@@ -76,8 +76,9 @@ app.post("/send-mail", async (req, res, next) => {
     });
 
     const message = {
-      from: '"Robert" <positronicshell@gmail.com>', // sender address
-      to: "positronicshell@gmail.com", // list of receivers
+      from: '"Mike" <contact@rememberingcovid19.co>', // sender address
+      to: "contact@rememberingcovid19.co", // list of receivers
+      cc: "positronicshell@gmail.com",
       subject: "Honor A Loved One: Submission",
       text: "A submission for consideration on the COVID Memorial", // plain text body
       html: `<!doctype html>

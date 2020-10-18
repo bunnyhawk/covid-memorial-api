@@ -1,18 +1,23 @@
 service: covid-api
 
+package:
+  exclude:
+    - secrets.yml
+
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  secrets: ${file(secrets.yml):${self:custom.stage}}
+
 provider:
   name: aws
   runtime: nodejs12.x
   stage: dev
   region: us-west-2
-  stackName: myserverless-lambda-${self:provider.stage}
-  role: arn:aws:iam::515110458415:role/lambda-apigateway-role
   apiGateway:
     binaryMediaTypes:
       - "*/*"
-      - "multipart/form-data"
   environment:
-    MAIL_ACCESS: "jszt ovpp eccf vgta"
+    MAIL_ACCESS: "${self:custom.secrets.MAIL_ACCESS}"
 
 functions:
   covidApi:
